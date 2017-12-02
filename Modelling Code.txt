@@ -1,0 +1,109 @@
+Simulation
+Now that we have complete equations of motion describing the dynamics of the system, we
+can create a simulation environment in which to test and view the results of various inputs and
+controllers. Although more advanced methods are available, we can quickly write a simulator
+which utilizes Euler’s method for solving differential equations to evolve the system state. In
+MATLAB, this simulator would be written as follows.
+
+1 % SIMULATION TIMES, IN SECONDS.
+2 start_time = 0;
+3 end_time = 10;
+4 dt = 0.005;
+5 times = start_time:dt:end_time;
+6
+
+============================================= 
+ 
+7 % NUMBER OF POINTS IN THE SIMULATION.
+8 N = numel(times);
+9
+
+========================================== 
+ 
+10 % Initial simulation state.
+11 x = [0; 0; 10];
+12 xdot = zeros(3, 1);
+13 theta = zeros(3, 1);
+14
+
+=================================================================
+
+15 % SIMULATE SOME DISTURBANCE IN THE ANGULAR VELOCITY.
+16 % THE MAGNITUDE OF THE DEVIATION IS IN RADIANS / SECOND.
+17 deviation = 100;
+18 thetadot = deg2rad(2 * deviation * rand(3, 1) - deviation);
+19
+
+============================================================================
+
+20 % STEP THROUGH THE SIMULATION, UPDATING THE STATE.
+21 for t = times
+
+=============================================================
+ 
+22 % TAKE INPUT FROM OUR CONTROLLER.
+23 i = input(t);
+24
+25 omega = thetadot2omega(thetadot, theta);
+26
+
+======================================================================
+
+27 % COMPUTE LINEAR AND ANGULAR ACCELERATIONS.
+28 a = acceleration(i, theta, xdot, m, g, k, kd);
+29 omegadot = angular_acceleration(i, omega, I, L, b, k);
+30
+31 omega = omega + dt * omegadot;
+32 thetadot = omega2thetadot(omega, theta);
+33 theta = theta + dt * thetadot;
+34 xdot = xdot + dt * a;
+35 x = x + dt * xdot;
+36 end
+
+================================================================================
+
+========================================================================================================================================
+WE WOULD THEN NEED FUNCTIONS TO COMPUTE ALL OF THE PHYSICAL FORCES AND TORQUES.
+========================================================================================================================================
+1 % Compute thrust given current inputs and thrust coefficient.
+2 function T = thrust(inputs, k)
+
+===================================================================
+
+3 % Inputs are values for wi
+2
+4 T = [0; 0; k * sum(inputs)];
+5 end
+6
+
+========================================================
+
+7 % Compute torques, given current inputs, length, drag coefficient, and thrust coefficient.
+8 function tau = torques(inputs, L, b, k)
+
+==================================================================================================
+
+9 % Inputs are values for wi
+2
+10 tau = [
+11 L * k * (inputs(1) - inputs(3))
+6
+12 L * k * (inputs(2) - inputs(4))
+13 b * (inputs(1) - inputs(2) + inputs(3) - inputs(4))
+14 ];
+15 end
+16
+17 function a = acceleration(inputs, angles, xdot, m, g, k, kd)
+18 gravity = [0; 0; -g];
+19 R = rotation(angles);
+20 T = R * thrust(inputs, k);
+21 Fd = -kd * xdot;
+22 a = gravity + 1 / m * T + Fd;
+23 end
+24
+25 function omegadot = angular_acceleration(inputs, omega, I, L, b, k)
+26 tau = torques(inputs, L, b, k);
+27 omegaddot = inv(I) * (tau - cross(omega, I * omega));
+28 end
+
+===========================================================================================================================================================================
